@@ -62,7 +62,6 @@ def compute_autofl_scores(result_dirs, project=None, verbose=False):
             json_status[bug_name] = json_status.get(bug_name, {"OK": [], "OtherError": [], "InvalidRequestError": []}) 
             score_results[bug_name] = score_results.get(bug_name, {})   
             
-            # === [新增指标初始化] ===
             efficiency_stats[bug_name] = efficiency_stats.get(bug_name, {
                 'time': 0.0, 
                 'main_prompt': 0, 'main_comp': 0, 
@@ -88,10 +87,8 @@ def compute_autofl_scores(result_dirs, project=None, verbose=False):
 
             if pred_status == "OK":
                 stat = efficiency_stats[bug_name]
-                # 兼容新老版本的耗时键名
                 stat['time'] += autofl_data.get('total_time_seconds', autofl_data.get('time_seconds', 0.0))
                 
-                # === [修改：优先从 cost_breakdown 读取 Token] ===
                 cost = autofl_data.get("cost_breakdown", {})
                 main_tokens = cost.get("main_agent_tokens", autofl_data.get('main_agent_tokens', {'prompt': 0, 'completion': 0}))
                 stat['main_prompt'] += main_tokens.get('prompt', 0)
@@ -102,11 +99,10 @@ def compute_autofl_scores(result_dirs, project=None, verbose=False):
                     stat['sub_prompt'] += sub_tokens.get("prompt", 0)
                     stat['sub_comp'] += sub_tokens.get("completion", 0)
                 else:
-                    # 兼容老版本的通过 parse message 读取
                     sub_prompt, sub_comp = 0, 0
                     for msg in autofl_data.get("messages", []):
                         if (msg.get("role") == "function" and msg.get("name") == "nominate_suspicious_method") \
-                           or (msg.get("role") == "tool"):  # 兼容新 tools API 格式
+                           or (msg.get("role") == "tool"):  # (comment removed)
                             content = msg.get("content", "")
                             try:
                                 json_start = content.find('{')
@@ -121,7 +117,6 @@ def compute_autofl_scores(result_dirs, project=None, verbose=False):
                     stat['sub_prompt'] += sub_prompt
                     stat['sub_comp'] += sub_comp
 
-                # === [新增：提取微观行为指标] ===
                 attempts = autofl_data.get("dynamic_verification_attempts", [])
                 stat['num_methods_verified'] += len(attempts)
                 for attempt in attempts:
@@ -196,7 +191,7 @@ def get_seen_methods_from_msgs(ri, messages, language):
                 continue
             content_data = raw_content
         elif (msg['role'] == 'function' and msg.get('name') == 'get_code_snippet') \
-             or msg['role'] == 'tool':  # 兼容新 tools API 格式
+             or msg['role'] == 'tool':  # (comment removed)
             try:
                 content_data = json.loads(msg.get('content', '""'))
             except Exception:
@@ -353,25 +348,21 @@ if __name__ == '__main__':
     parser.add_argument('--aux', '-a', action="store_true")
     args = parser.parse_args()
 
-    # 1. 提取所有状态并评分 (此处融合了微观行为统计)
     json_files, autofl_scores, efficiency_stats = compute_autofl_scores(args.result_dirs, args.project, args.verbose)
 
     if not autofl_scores:
         print("⚠️ No valid results found. Exiting.")
         exit(0)
 
-    # 2. 赋予辅助分数
     if args.aux:
         method_scores = add_auxiliary_scores(json_files, autofl_scores, args.language, verbose=args.verbose)
     else:
         method_scores = add_auxiliary_scores(json_files, autofl_scores, args.language, default_aux_score=0, verbose=args.verbose)
     
-    # 3. 排序并比对 Ground Truth
     method_scores = assign_rank(method_scores)
     buggy_method_ranks = get_buggy_method_ranks(method_scores, key="autofl_rank")
 
     # ============================================================
-    # 汇总与计算均值
     # ============================================================
     summary = {"total": len(method_scores)}
     for n in range(1, 11):
@@ -398,7 +389,6 @@ if __name__ == '__main__':
         avg_guardrail = sum(efficiency_stats[b]['guardrail_rejects'] / efficiency_stats[b]['valid_count'] for b in valid_bugs) / len(valid_bugs)
         avg_tool_error = sum(efficiency_stats[b]['tool_errors'] / efficiency_stats[b]['valid_count'] for b in valid_bugs) / len(valid_bugs)
 
-    # 打印格式化输出
     print("\n" + "="*60)
     print("🎯 FL Accuracy Summary")
     print("="*60)
@@ -426,7 +416,6 @@ if __name__ == '__main__':
     print(f"Tool Errors               : {avg_tool_error:.2f} times")
     print("="*60 + "\n")
 
-    # 保存扩充后的 JSON
     data = {
         "summary": summary,
         "efficiency_summary": {

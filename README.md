@@ -1,158 +1,167 @@
-# AutoFL
+# ProbeFL Artifact
 
-<div align="center">
-<img src="./assets/AutoFL_logo_DALLE.png" width="300px"/>
-</div>
+This repository contains the code, data, and scripts for the paper:
+**"Probe First, Guess Later: Empowering LLMs with Interactive Debuggers for Method-Level Fault Localization."**
 
-> This artifact accompanies the paper **_A Quantitative and Qualitative Evaluation of LLM-based Explainable Fault Localization_** accepted to FSE'24.
+## Contents
 
-# Environmental Setup
-## Python Dependencies
-- Compatible with Python >= 3.10
-- Compatible with `openai>=0.27.8,<=0.28.1` (not compatible with `openai>=1.0.0`)
-
-Install the required dependencies using the following command:
-
-```shell
-python -m pip install pandas python-dotenv tqdm markdown2 tiktoken "openai>=0.27.8,<=0.28.1" javalang-ext scipy numpy matplotlib jupyter seaborn nbformat
+```
+├── code/                  # Core implementation
+│   ├── autofl.py          # Main entry point
+│   ├── run_probefl_batch.py  # Batch experiment runner
+│   ├── compute_score.py   # Scoring script
+│   ├── lib/               # Core libraries
+│   │   ├── protocol.py    # JDB backend + ablation logic
+│   │   ├── verify_agent.py    # JDB verification agent
+│   │   ├── llm_utils.py   # LLM API client (supports OpenAI-compatible endpoints)
+│   │   ├── repo_interface.py  # Repository abstraction layer
+│   │   ├── d4j_interface.py   # Defects4J-specific interface
+│   │   └── ...
+│   └── prompts/           # Agent prompts
+├── scripts/               # Analysis scripts
+│   ├── rq1/               # RQ1: comparison with baselines
+│   ├── rq2/               # RQ2: ablation study
+│   └── rq3/               # RQ3: cost & runtime analysis
+├── data/baseline/         # Baseline comparison data (CSV)
+├── figures/               # Paper figures (PDF + LaTeX tables)
+└── scores/                # Final per-project scoring results (JSON + CSV)
 ```
 
-## OpenAI API Setup
-Before using AutoFL, set up your OpenAI API credentials by creating a `.env` file with the following content:
+## Environment Setup
 
-```shell
-OPENAI_API_KEY={YOUR_API_KEY}
-OPENAI_ORG_KEY={YOUR_ORG_KEY} # Optional
-```
-Replace `{YOUR_API_KEY}` with your OpenAI API key and `{YOUR_ORG_KEY}` with your organization's API key.
+```bash
+# Python 3.10+
+pip install openai python-dotenv javalang pandas numpy tqdm matplotlib venn
 
-# Guide to Reproduction
-
-## 0. Raw Data Files
-- `./results/{label}/{model}/XFL-{bugname}.json`: the `AutoFL` results
-- `./results/{label}/{model}/downstream_*`: the interaction data with LLM for the downstream tasks (APR and Test Generation)
-  - The summary of the evaluation results can be found at `notebooks/resources/[APR|TestGen]_results.csv`.
-- `./combined_fl_results`: minimized version of AutoFL + ablation results
-
-## 1. Generate Detailed AutoFL Results Files
-
-To obtain comprehensive AutoFL results files, please execute the following command:
-```shell
-sh compute_scores.sh
-```
-Running this command will generate complete score data files (`*_full.json`) within the `combined_fl_results` directory, utilizing the raw data sourced from the `results` directory.
-
-## 2. Reproduce Results in the Paper
-
-- After generating the comprehensive FL results files, the figures in the paper can be reproduced via the Jupyter notebook files within the directory [`./notebooks`](./notebooks/).
-  - Any necessary files for the analysis are included in the directory [`./notebooks/resources`](./notebooks/resources/)
-  - If you execute the notebooks, the figures will be saved to [`./notebooks/figures`](./notebooks/figures/).
-
-
-# General Usage
-
-## Run AutoFL
-
-To run AutoFL, use the following command:
-```shell
-sh runner.sh {expr_label} {num_repetitions} {dataset}
+# Defects4J v1.2.0 must be installed and available at $D4J_HOME
+# The project expects Defects4J checkouts at: data/defects4j/{bug_name}/
 ```
 
-Replace `{expr_label}` with a label for your experiment, `{num_repetitions}` with the number of repetitions (`R` in the paper), and `{dataset}` with the dataset you want to use (`defects4j` or `bugsinpy`).
+## Configuration
 
-## Compute Scores
-```shell
-python compute_score.py {result_directories} -l {java|python} -a -v -o {json_output_file}
+Create a `.env` file with your API credentials:
+
+```
+OPENAI_API_KEY=your_api_key_here
+OPENAI_API_BASE_URL=https://api.openai.com/v1
 ```
 
-`{result_directories}` should be the directories containing your AutoFL result files.
-- `-l` specifies the language (either `java` or `python`).
-- `-a` enables the use of auxiliary scores to break ties.
-- `-v` enables verbose mode.
-- `-o` specifies the path to the JSON output file.
+The code is compatible with any OpenAI-compatible API endpoint.
 
-## Examples
+## Running a Single Bug
 
-- Defects4J
-    ```shell
-    sh runner.sh my_d4j_autofl_ 5 defects4j
-    python compute_score.py results/my_d4j_autofl_*/gpt-3.5-turbo-0613 -l java -a -v -o d4j_scores.json
-    ```
-- BugsInPy
-    ```shell
-    sh runner.sh my_bip_autofl_ 5 bugsinpy
-    python compute_score.py results/my_bip_autofl_*/gpt-3.5-turbo-0613 -l python -a -v -o bip_scores.json
-    ```
+```bash
+python3 code/autofl.py \
+  -m gpt-5.4-2026-03-05 \
+  --verifier_model gpt-5.4-2026-03-05 \
+  -b Math_2 \
+  -p code/prompts/system_msg_newfl.txt \
+  -o results/Math_2.json \
+  --max_budget 10 \
+  --show_line_number \
+  --postprocess_test_snippet \
+  --allow_multi_predictions \
+  --dynamic
+```
 
+## Running Batch Experiments
 
-跑rq3指令(根目录下)：
-python3 scripts/rq3/summarize_probefl_rq3_by_project.py \
-  --input-dir "./results/ProbeFL_FULL/gpt-4o-2024-11-20/" \
-  --glob "**/*.json" \
-  --mode-name ALL \
-  --ablation-mode ALL \
-  --output-prefix "./scripts/rq3/probefl_rq3_full"
+```bash
+# FULL mode
+python3 code/run_probefl_batch.py \
+  --model gpt-5.4-2026-03-05 \
+  --verifier_model gpt-5.4-2026-03-05 \
+  --base_label ProbeFL_54 \
+  --projects all \
+  --budget 10 \
+  --timeout 2400 \
+  --prompt code/prompts/system_msg_newfl.txt \
+  --parallel 2 \
+  --modes full
 
-python3 scripts/rq3/plot_rq3_overhead_boxplot.py \
-  --per-bug ./scripts/rq3/probefl_rq3_full_per_bug_details.csv \
-  --out-dir ./scripts/rq3/figures
+# Ablation modes: no_context_bridge, no_reflection, no_dynamic
+```
 
-  (--drop-error-rows)
+## Reproducing Paper Results
 
-python3 scripts/rq3/plot_rq3_dynamic_tool_violin.py \
-  --per-bug ./scripts/rq3/probefl_rq3_full_per_bug_details.csv \
-  --out-dir ./scripts/rq3/figures \
-  --merge-rare
+### RQ1: Comparison with Baselines
 
-  (--drop-error-rows)
-
-python3 scripts/rq3/summarize_rq3_probing_invocation.py \
-  --per-bug ./scripts/rq3/probefl_rq3_full_per_bug_details.csv \
-  --out-dir ./scripts/rq3/tables
-
-  (--drop-error-rows)
-
-跑rq2指令：
-MODEL=gpt-4o-2024-11-20
-
-PROJECTS="Chart Closure Lang Math Time"
-MODES="ProbeFL_FULL ProbeFL_NO_CONTEXT_BRIDGE ProbeFL_NO_RUNTIME_FUSION ProbeFL_NO_REFLECTION"
-
-mkdir -p scripts/rq2/scores scripts/rq2/logs
-
-for PROJECT in $PROJECTS; do
-  for MODE in $MODES; do
-    echo "============================================================"
-    echo "Processing PROJECT=$PROJECT MODE=$MODE"
-    echo "============================================================"
-
-    PYTHONPATH=. python3 scripts/rq2/compute_score_verifl.py \
-      "results/${MODE}/${MODEL}" \
-      -p "$PROJECT" \
-      -l java \
-      -o "scripts/rq2/scores/${PROJECT}_${MODE}_scores.json" \
-      --aux \
-      2>&1 | tee "scripts/rq2/logs/${PROJECT}_${MODE}.log"
-  done
+```bash
+# Step 1: Generate per-project scores
+for proj in Chart Closure Lang Math Time; do
+  PYTHONPATH=. python3 scripts/rq2/compute_score_verifl.py \
+    results/ProbeFL_54_FULL/gpt-5.4-2026-03-05 \
+    --language java -a -p $proj \
+    -o scores/${proj}_ProbeFL_54_FULL_scores.json
 done
 
-python3 - << 'PY'
-import json
-from pathlib import Path
+# Step 2: Run comparison
+PYTHONPATH=. python3 scripts/rq1/run_rq1.py --policy common
+PYTHONPATH=. python3 scripts/rq1/plot_rq1.py --policy common
+```
 
-score_dir = Path("scripts/rq2/scores")
+### RQ2: Ablation Study
 
-for path in sorted(score_dir.glob("*_scores.json")):
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+```bash
+python3 scripts/rq2/run_rq2.py \
+  --score-dir scores/ \
+  --out-dir scores/
+```
 
-    summary = data.get("summary", {})
-    print(
-        path.name,
-        "total=", summary.get("total"),
-        "acc@1=", summary.get("acc@1"),
-        "acc@3=", summary.get("acc@3"),
-        "acc@5=", summary.get("acc@5"),
-        "acc@10=", summary.get("acc@10"),
-    )
-PY
+### RQ3: Cost & Runtime Analysis
+
+```bash
+# Step 1: Summarize results
+PYTHONPATH=. python3 scripts/rq3/summarize_probefl_rq3_by_project.py \
+  --input-dir results/ProbeFL_54_FULL/gpt-5.4-2026-03-05 \
+  --output-prefix scores/probefl_rq3_full \
+  --mode-name ALL \
+  --exclude-errors
+
+# Step 2: Generate figures and tables
+PYTHONPATH=. python3 scripts/rq3/plot_rq3_overhead_boxplot.py \
+  --per-bug scores/probefl_rq3_full_per_bug_details.csv
+PYTHONPATH=. python3 scripts/rq3/plot_rq3_dynamic_tool_violin.py \
+  --per-bug scores/probefl_rq3_full_per_bug_details.csv
+PYTHONPATH=. python3 scripts/rq3/analyze_rq3_cost.py \
+  --per-bug scores/probefl_rq3_full_per_bug_details.csv
+PYTHONPATH=. python3 scripts/rq3/summarize_rq3_probing_invocation.py \
+  --per-bug scores/probefl_rq3_full_per_bug_details.csv
+```
+
+## Model Configuration
+
+All experiments were conducted using:
+- **Main Agent**: `gpt-5.4-2026-03-05`
+- **Verifier Agent**: `gpt-5.4-2026-03-05`
+- **Temperature**: 0.0
+- **Max Budget**: 10 steps per bug
+- **Max Verification Attempts**: 2 (1 in no_reflection ablation)
+
+The API endpoint used was an OpenAI-compatible proxy. Any OpenAI-compatible endpoint
+supporting `gpt-5.4-2026-03-05` or equivalent models can be used.
+
+## Key Results (353 Defects4J v1.2.0 bugs)
+
+| Metric | ProbeFL | PingFL | AutoFL | Ochiai |
+|--------|---------|--------|--------|--------|
+| acc@1 | 284 (80.5%) | 242 (70.1%) | 245 (71.0%) | 102 (29.6%) |
+| acc@3 | 303 (85.8%) | 273 (79.1%) | 264 (76.5%) | 185 (53.6%) |
+| MRR | 0.855 | 0.746 | 0.735 | 0.447 |
+
+### Ablation (acc@1)
+
+| Mode | acc@1 | Δ vs FULL |
+|------|-------|-----------|
+| FULL | 284 | — |
+| w/o Context Bridge | 278 | -6 |
+| w/o Reflection | 267 | -17 |
+| w/o Dynamic | 262 | -22 |
+
+### Cost per Bug
+
+| Stage | Tokens | Cost (USD) |
+|-------|--------|------------|
+| Static Search | 47.8K | $0.156 |
+| Runtime Probing | 167.9K | $0.482 |
+| **Total** | **215.6K** | **$0.638** |
