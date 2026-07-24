@@ -1,7 +1,7 @@
 # ProbeFL Artifact
 
 This repository contains the code, data, and scripts for the paper:
-**"Probe First, Guess Later: Empowering LLMs with Interactive Debuggers for Method-Level Fault Localization."**
+**"Debug Before You Guess: Empowering LLMs with Interactive Debuggers for Method-Level Fault Localization."**
 
 ## Contents
 
