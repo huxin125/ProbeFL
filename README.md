@@ -31,10 +31,9 @@ This repository contains the code, data, and scripts for the paper:
 
 ```bash
 # Python 3.10+
-pip install openai python-dotenv javalang pandas numpy tqdm matplotlib venn
+pip install -r requirements.txt
 
-# Defects4J v1.2.0 must be installed and available at $D4J_HOME
-# The project expects Defects4J checkouts at: data/defects4j/{bug_name}/
+# Defects4J v1.2.0 (JDK 8 required)
 ```
 
 ## Configuration
