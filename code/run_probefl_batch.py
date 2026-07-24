@@ -8,7 +8,7 @@ import subprocess
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 
-from autofl import AutoDebugger
+from probefl import AutoDebugger
 from lib.protocol import PersistentJDBBackend
 from lib.repo_interface import get_repo_interface, get_bug_metadata
 

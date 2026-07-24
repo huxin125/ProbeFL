@@ -7,7 +7,7 @@ This repository contains the code, data, and scripts for the paper:
 
 ```
 ├── code/                  # Core implementation
-│   ├── autofl.py          # Main entry point
+│   ├── probefl.py          # Main entry point
 │   ├── run_probefl_batch.py  # Batch experiment runner
 │   ├── compute_score.py   # Scoring script
 │   ├── lib/               # Core libraries
@@ -51,7 +51,7 @@ The code is compatible with any OpenAI-compatible API endpoint.
 ## Running a Single Bug
 
 ```bash
-python3 code/autofl.py \
+python3 code/probefl.py \
   -m gpt-5.4-2026-03-05 \
   --verifier_model gpt-5.4-2026-03-05 \
   -b Math_2 \
